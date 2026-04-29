@@ -6,23 +6,23 @@ import anthropic
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 介面淨化：使用修正後的 CSS，確保輸入框可點擊且無提示文字
+# 2. 介面淨化：CSS 隱藏內建提示，確保不重疊
 st.markdown("""
     <style>
-    /* 隱藏輸入框下方的提示文字 (Press Enter to apply) */
+    /* 隱藏所有輸入框內建的指令文字 */
     div[data-testid="stInputInstructions"] {
         display: none !important;
     }
-    /* 調整分頁組件的字體與間距 */
+    /* 調整分頁標籤樣式 */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 系統靜態資料：2026 最新模型清單與廠商連結
+# 3. 系統資料：更新 2026 最新官方連結與模型清單
 PROVIDER_INFO = {
-    "Google Gemini": "https://aistudio.google.com/app/model",
+    "Google Gemini": "https://aistudio.google.com/app/prompts/new",
     "OpenAI": "https://platform.openai.com/docs/models",
     "Anthropic Claude": "https://docs.anthropic.com/en/docs/about-claude/models",
     "xAI Grok": "https://console.x.ai/",
@@ -33,22 +33,24 @@ PROVIDER_INFO = {
 
 MODEL_DATA = {
     "Google Gemini": [
-        "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
-        "Gemini 2.5 Flash", "Gemini 2.5 Pro", "Gemini 2.5 Flash-Lite", "Gemini Embedding 2"
+        "自定義輸入", 
+        "gemini-3.1-flash-lite (免費)", 
+        "gemini-3-flash (免費)", 
+        "gemini-3.1-pro", 
+        "gemini-2.5-flash", 
+        "gemini-2.5-pro"
     ],
     "OpenAI": [
-        "自定義輸入", "GPT-5.2", "GPT-5 mini", "GPT-5 nano", "GPT-5.2 pro", "GPT-5", 
-        "GPT-4.1", "gpt-oss-120b", "gpt-oss-20b", "o3-deep-research", "o4-mini-deep-research"
+        "自定義輸入", "GPT-5.2", "GPT-5 mini", "GPT-5 nano", "GPT-5", "o3-deep-research"
     ],
     "Anthropic Claude": [
-        "自定義輸入", "Claude Opus 4.7", "Claude Opus 4.6", "Claude Sonnet 4.6", "Claude Haiku 4.5"
+        "自定義輸入", "Claude Opus 4.7", "Claude Sonnet 4.6", "Claude Haiku 4.5"
     ],
     "xAI Grok": [
-        "自定義輸入", "grok-4.1", "grok-4.1-mini", "grok-3", "grok-3-mini"
+        "自定義輸入", "grok-4.1", "grok-4.1-mini", "grok-3"
     ],
     "DeepSeek": [
-        "自定義輸入", "DeepSeek-V4", "DeepSeek-V4 Flash", "DeepSeek-V4 Pro", "DeepSeek-V3.1", 
-        "DeepSeek R1", "DeepSeek Math-7B"
+        "自定義輸入", "DeepSeek-V4", "DeepSeek-V4 Pro", "DeepSeek R1"
     ],
     "NVIDIA": [
         "自定義輸入", "Nemotron RAG (嵌入與語言重排序)"
@@ -78,14 +80,14 @@ with st.sidebar:
 
     st.write("---")
 
-    # 選擇模型 (自定義輸入已置首)
     temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider])
     
     if temp_model == "自定義輸入":
         final_model = st.text_input("輸入精確模型 ID：", key=f"custom_{provider}_id")
+        st.caption("輸入或貼上後請按下 Enter 鍵以套用內容。")
         st.caption(f"請參閱 [官方模型清單]({PROVIDER_INFO[provider]})")
     else:
-        final_model = temp_model
+        final_model = temp_model.split(" (")[0]
 
 # 5. 主介面
 st.title("AI 指令優化工具")
@@ -103,7 +105,7 @@ if st.button("執行優化"):
     elif not raw_prompt:
         st.warning("請輸入指令內容。")
     else:
-        # 強制 AI 只輸出指令結構的系統提示
+        # 純淨指令結構設定
         system_instruction = (
             "你是一位專業的提示詞工程師。請將輸入內容重構為高品質的 Markdown 提示詞結構。 "
             "輸出結果必須僅包含以下標題及其詳盡內容：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
@@ -112,7 +114,6 @@ if st.button("執行優化"):
         
         with st.spinner("執行中..."):
             try:
-                # 服務商分流
                 if provider == "Google Gemini":
                     formatted_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
                     genai.configure(api_key=api_key)
@@ -129,7 +130,6 @@ if st.button("執行優化"):
                     res = response.content[0].text
 
                 else:
-                    # 相容 OpenAI 接口的提供商 (OpenAI, xAI Grok, DeepSeek, NVIDIA, OpenRouter)
                     base_urls = {
                         "OpenAI": None,
                         "xAI Grok": "https://api.x.ai/v1",
