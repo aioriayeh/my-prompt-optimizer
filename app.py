@@ -6,26 +6,32 @@ import anthropic
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. UI 空間佈局優化
+# 2. 深度 UI 修復邏輯
 st.markdown("""
     <style>
+    /* 解決選單消失：確保側邊欄容器允許溢出內容顯示 */
+    [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+        overflow: visible !important;
+    }
+    
+    /* 解決文字重疊：物理加大輸入框高度，確保使用者文字與提示小字互不干擾 */
     div[data-testid="stTextInput"] > div[data-baseweb="input"] {
-        min-height: 60px !important; 
-        padding-top: 5px !important;
+        min-height: 65px !important; 
+        display: flex !important;
+        align-items: flex-start !important;
+        padding-top: 10px !important;
     }
     
     div[data-testid="stTextInput"] input {
-        margin-bottom: 15px !important; 
+        line-height: 1.5 !important;
+        margin-bottom: 20px !important; /* 強制推開底部小字 */
     }
 
+    /* 規範提示小字位置 */
     div[data-testid="stInputInstructions"] {
         position: absolute !important;
-        bottom: 2px !important;
-        font-size: 10px !important;
-    }
-
-    [data-testid="stSidebarContent"] {
-        padding-top: 2rem !important;
+        bottom: 5px !important;
+        font-size: 11px !important;
     }
 
     .stTabs [data-baseweb="tab-list"] button {
@@ -34,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 2026 完整模型清單資料庫
+# 3. 2026 完整模型資料庫
 MODEL_DATA = {
     "Google Gemini": [
         "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
@@ -63,75 +69,74 @@ MODEL_DATA = {
     ]
 }
 
-# 4. 側邊欄配置
+# 4. 初始化 Session State 保險箱
+if "api_keys" not in st.session_state:
+    st.session_state["api_keys"] = {p: "" for p in MODEL_DATA.keys()}
+
+# 5. 側邊欄配置
 with st.sidebar:
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True) # 緩衝頂部空間
     st.title("系統配置")
     
-    provider = st.radio(
-        "選擇服務提供商：", 
-        list(MODEL_DATA.keys()), 
-        index=0, 
-        key="stable_provider_selector"
-    )
+    # 服務商選擇
+    provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()), key="provider_selector")
     
-    if "key_store" not in st.session_state:
-        st.session_state["key_store"] = {}
-    
-    # 金鑰輸入
-    current_key_name = f"{provider}_key"
-    user_key = st.text_input(
+    # API 金鑰同步輸入 (每個服務商擁有獨立元件 Key 以確保刷新)
+    api_key = st.text_input(
         "輸入 API 金鑰：", 
-        value=st.session_state["key_store"].get(current_key_name, ""), 
+        value=st.session_state["api_keys"].get(provider, ""), 
         type="password",
-        key="api_key_universal"
+        key=f"api_input_{provider}"
     )
-    st.session_state["key_store"][current_key_name] = user_key
+    st.session_state["api_keys"][provider] = api_key
 
     st.write("---")
 
-    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"model_select_{provider}")
+    # 模型選取 (自定義輸入預設首位)
+    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"model_list_{provider}")
     
     if temp_model == "自定義輸入":
         final_model = st.text_input("輸入精確模型 ID：", key=f"custom_id_{provider}")
-        st.caption("貼上 ID 後，請按下 Enter 鍵以套用。")
+        st.caption("貼上模型 ID 後，請按下 Enter 鍵以套用。")
     else:
         final_model = temp_model
 
-# 5. 主介面
+# 6. 主介面
 st.title("AI 指令優化工具")
 st.text(f"當前模式：{provider} / {final_model}")
 
 raw_prompt = st.text_area("原始指令內容：", placeholder="請輸入欲優化的指令內容...", height=150)
 
 if st.button("執行優化"):
-    api_key = st.session_state["key_store"].get(current_key_name)
+    current_key = st.session_state["api_keys"].get(provider)
     
-    if not api_key:
+    if not current_key:
         st.error("錯誤：未偵測到金鑰。")
     elif not final_model:
         st.warning("請先輸入模型 ID。")
     elif not raw_prompt:
         st.warning("請輸入內容。")
     else:
+        # 指令優化核心 (內建術語校準邏輯)
         system_instruction = (
-            "你是一位具備深度語意洞察力的專家。請優化使用者的原始需求。 "
-            "1. 語意診斷：若發現術語錯誤（如: up down），請自動更正為專業術語（如: Top-Down）。 "
-            "2. 專家分配：根據需求自動分配專業角色，嚴禁稱呼自己為優化器。 "
-            "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何說明。 "
-            "結構：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
-            "使用正體中文回答。"
+            "你是一位專業的提示詞工程師。請優化使用者的原始需求。 "
+            "1. 語意診斷：若發現術語錯誤（如: up down），請根據上下文推論意圖並自動校正（如: Top-Down）。 "
+            "2. 專家分配：根據校正後的需求分配專業角色。 "
+            "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何前言說明。 "
+            "結構：[角色任務]、[背景資訊]、[具體指令]、[約束條件]、[思維鏈引導 (CoT)]。 "
+            "使用正體中文。"
         )
         
-        with st.spinner("語意診斷中..."):
+        with st.spinner("語意優化中..."):
             try:
                 if provider == "Google Gemini":
                     f_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
-                    genai.configure(api_key=api_key)
+                    genai.configure(api_key=current_key)
                     model = genai.GenerativeModel(f_model)
-                    response = model.generate_content(f"{system_instruction}\n\n需求：{raw_prompt}")
+                    response = model.generate_content(f"{system_instruction}\n\n需求內容：{raw_prompt}")
                     res = response.text
                 elif provider == "Anthropic Claude":
-                    client = anthropic.Anthropic(api_key=api_key)
+                    client = anthropic.Anthropic(api_key=current_key)
                     response = client.messages.create(
                         model=final_model, max_tokens=4096, system=system_instruction,
                         messages=[{"role": "user", "content": raw_prompt}]
@@ -142,7 +147,7 @@ if st.button("執行優化"):
                         "OpenAI": None, "xAI Grok": "https://api.x.ai/v1", "DeepSeek": "https://api.deepseek.com", 
                         "NVIDIA": "https://integrate.api.nvidia.com/v1", "OpenRouter": "https://openrouter.ai/api/v1"
                     }
-                    client = OpenAI(api_key=api_key, base_url=base_urls.get(provider))
+                    client = OpenAI(api_key=current_key, base_url=base_urls.get(provider))
                     response = client.chat.completions.create(
                         model=final_model,
                         messages=[{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_prompt}],
@@ -153,7 +158,7 @@ if st.button("執行優化"):
                 st.write("---")
                 tab_code, tab_preview = st.tabs(["指令複製", "結果預覽"])
                 with tab_code:
-                    st.info("請點擊右上方按鈕複製專業指令。")
+                    st.info("說明：請點擊右上角按鈕複製專業指令。")
                     st.code(res, language="markdown")
                 with tab_preview:
                     st.markdown(res)
