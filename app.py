@@ -34,7 +34,7 @@ if st.button("開始精煉指令"):
         # 使用診斷清單中確認存在的精確名稱
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        # 專家優化逻辑
+        # 專家優化邏輯
         system_instruction = (
             "你是一名專業的提示詞工程師 (Prompt Engineer)。"
             "請將使用者的輸入轉化為結構化指令，包含以下維度：\n"
