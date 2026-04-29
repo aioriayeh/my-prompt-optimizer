@@ -3,93 +3,124 @@ import google.generativeai as genai
 from openai import OpenAI
 import anthropic
 
-# 頁面基本設定
-st.set_page_config(page_title="全能 AI 指令轉接站", page_icon="🤖", layout="wide")
+# 頁面配置
+st.set_page_config(page_title="萬能 AI 指令中心", page_icon="🌐", layout="wide")
 
-# --- 側邊欄：配置與記憶功能 ---
+# --- 初始化 Session State ---
+if "api_keys" not in st.session_state:
+    st.session_state["api_keys"] = {}
+
+# --- 側邊欄：進階模型選單 ---
 with st.sidebar:
-    st.title("⚙️ 模型配置面板")
+    st.title("🛡️ 模型總署")
     
-    # 1. 選擇服務商
-    provider = st.radio("選擇 AI 服務商：", ["Google Gemini", "OpenAI ChatGPT", "Anthropic Claude"])
+    # 分組選單配置
+    provider_groups = {
+        "主流巨頭": ["Google Gemini", "OpenAI ChatGPT", "Anthropic Claude"],
+        "模型聚合器": ["OpenRouter (推薦)", "Groq (極速)", "Together AI"],
+        "獨立服務商": ["DeepSeek", "Mistral AI", "Perplexity", "Perplexity Sonar"]
+    }
+    
+    # 扁平化列表用於 selectbox
+    all_providers = []
+    for group, p_list in provider_groups.items():
+        all_providers.extend(p_list)
+
+    selected_provider = st.selectbox("請選擇服務提供商：", all_providers, index=0)
     
     st.divider()
+
+    # 動態顯示金鑰輸入與獲取引導
+    current_key_name = f"{selected_provider}_key"
+    default_key = st.secrets.get(current_key_name, "")
     
-    # 2. 動態顯示對應的金鑰輸入框
-    # 讀取 Secrets 作為隱形回退值
-    def_gemini = st.secrets.get("GEMINI_API_KEY", "")
-    def_openai = st.secrets.get("OPENAI_API_KEY", "")
-    def_claude = st.secrets.get("ANTHROPIC_API_KEY", "")
+    user_key = st.text_input(
+        f"輸入 {selected_provider} API Key:",
+        value=st.session_state["api_keys"].get(current_key_name, default_key),
+        type="password"
+    )
+    st.session_state["api_keys"][current_key_name] = user_key
 
-    if provider == "Google Gemini":
-        st.session_state["active_key"] = st.text_input("Gemini API Key:", value=st.session_state.get("g_key", def_gemini), type="password")
-        st.session_state["g_key"] = st.session_state["active_key"]
-        model_name = st.selectbox("選擇模型:", ["models/gemini-2.5-flash", "models/gemini-1.5-pro", "models/gemini-flash-latest"])
-        
-    elif provider == "OpenAI ChatGPT":
-        st.session_state["active_key"] = st.text_input("OpenAI API Key:", value=st.session_state.get("o_key", def_openai), type="password")
-        st.session_state["o_key"] = st.session_state["active_key"]
-        model_name = st.selectbox("選擇模型:", ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"])
-        
-    elif provider == "Anthropic Claude":
-        st.session_state["active_key"] = st.text_input("Claude API Key:", value=st.session_state.get("c_key", def_claude), type="password")
-        st.session_state["c_key"] = st.session_state["active_key"]
-        model_name = st.selectbox("選擇模型:", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-haiku-20240307"])
+    # --- OpenRouter 特別引導 (解決您的需求) ---
+    if selected_provider == "OpenRouter (推薦)" and not user_key:
+        st.info("💡 尚未擁有金鑰？OpenRouter 提供許多免費模型！")
+        st.link_button("👉 前往獲取免費 API Key", "https://openrouter.ai/keys")
 
-    st.divider()
-    if st.session_state.get("active_key"):
-        st.success(f"✅ {provider} 已就緒")
-    else:
-        st.warning(f"⚠️ 請輸入 {provider} 的金鑰")
+    # 模型細項選擇 (範例，可根據需求擴充)
+    model_mapping = {
+        "Google Gemini": ["models/gemini-2.5-flash", "models/gemini-1.5-pro"],
+        "OpenAI ChatGPT": ["gpt-4o", "gpt-4o-mini"],
+        "Anthropic Claude": ["claude-3-5-sonnet-20240620"],
+        "OpenRouter (推薦)": ["google/gemini-flash-1.5", "meta-llama/llama-3.1-8b-instruct:free"],
+        "Groq (極速)": ["llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+        "DeepSeek": ["deepseek-chat", "deepseek-coder"]
+    }
+    
+    selected_model = st.selectbox("選擇具體模型：", model_mapping.get(selected_provider, ["default"]))
 
 # --- 主畫面介面 ---
-st.title("🤖 全能 AI 指令優化器")
-st.markdown(f"目前正在使用 **{provider}** 的 **{model_name}** 進行優化作業。")
+st.title("🚀 萬能指令優化器：專業版")
+st.caption(f"當前連線：{selected_provider} / {selected_model}")
 
 raw_prompt = st.text_area("原始指令：", placeholder="輸入你想優化的內容...", height=150)
 
-if st.button("開始跨模型優化"):
-    current_key = st.session_state.get("active_key")
+if st.button("啟動跨平台優化"):
+    api_key = st.session_state["api_keys"].get(current_key_name)
     
-    if not current_key:
-        st.error(f"❌ 偵測不到 {provider} 的 API 金鑰，請在左側面板配置。")
+    if not api_key:
+        st.error(f"❌ 缺少 {selected_provider} 的金鑰，優化無法啟動。")
     elif not raw_prompt:
-        st.warning("請輸入內容喔！")
+        st.warning("請先輸入一點內容。")
     else:
-        system_instruction = "你是一名專業的提示詞工程師，請將輸入轉化為 [角色任務]、[背景資訊]、[具體指令]、[約束條件] 四個維度。"
+        system_instruction = "你是一名提示詞工程師，將輸入轉化為角色、背景、指令、約束四個維度。使用正體中文。"
         
-        with st.spinner(f"正在透過 {provider} 進行運算..."):
+        with st.spinner(f"正在連線至 {selected_provider}..."):
             try:
-                # --- 分流處理邏輯 ---
-                if provider == "Google Gemini":
-                    genai.configure(api_key=current_key)
-                    model = genai.GenerativeModel(model_name)
+                # --- 多路分流處理器 ---
+                if selected_provider == "Google Gemini":
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel(selected_model)
                     response = model.generate_content(f"{system_instruction}\n\n輸入：{raw_prompt}")
-                    result_text = response.text
+                    res = response.text
 
-                elif provider == "OpenAI ChatGPT":
-                    client = OpenAI(api_key=current_key)
+                elif selected_provider in ["OpenAI ChatGPT", "Groq (極速)", "DeepSeek"]:
+                    # 這些都相容 OpenAI 格式，只需換 base_url
+                    urls = {
+                        "OpenAI ChatGPT": "https://api.openai.com/v1",
+                        "Groq (極速)": "https://api.groq.com/openai/v1",
+                        "DeepSeek": "https://api.deepseek.com"
+                    }
+                    client = OpenAI(api_key=api_key, base_url=urls.get(selected_provider))
                     response = client.chat.completions.create(
-                        model=model_name,
+                        model=selected_model,
                         messages=[{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_prompt}]
                     )
-                    result_text = response.choices[0].message.content
+                    res = response.choices[0].message.content
 
-                elif provider == "Anthropic Claude":
-                    client = anthropic.Anthropic(api_key=current_key)
+                elif selected_provider == "OpenRouter (推薦)":
+                    client = OpenAI(
+                        base_url="https://openrouter.ai/api/v1",
+                        api_key=api_key,
+                    )
+                    response = client.chat.completions.create(
+                        model=selected_model,
+                        messages=[{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_prompt}]
+                    )
+                    res = response.choices[0].message.content
+
+                elif selected_provider == "Anthropic Claude":
+                    client = anthropic.Anthropic(api_key=api_key)
                     response = client.messages.create(
-                        model=model_name,
-                        max_tokens=2048,
-                        system=system_instruction,
+                        model=selected_model, max_tokens=2048, system=system_instruction,
                         messages=[{"role": "user", "content": raw_prompt}]
                     )
-                    result_text = response.content[0].text
+                    res = response.content[0].text
 
-                # --- 顯示結果 ---
+                # 輸出結果
                 st.divider()
-                st.subheader("✨ 優化結果")
-                st.code(result_text, language="markdown")
-                st.markdown(result_text)
+                st.subheader("✨ 優化指令")
+                st.code(res, language="markdown")
+                st.markdown(res)
 
             except Exception as e:
-                st.error(f"⚠️ API 呼叫失敗：{str(e)}")
+                st.error(f"連線異常：{str(e)}")
