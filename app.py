@@ -3,44 +3,69 @@ import google.generativeai as genai
 from openai import OpenAI
 import anthropic
 
-# 1. 頁面基礎配置
+# 1. 頁面配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 精確 UI 淨化
+# 2. UI 空間優化
 st.markdown("""
     <style>
-    /* 隱藏輸入框下方的提示小字 (Press Enter to apply) */
-    div[data-testid="stInputInstructions"] {
-        display: none !important;
+    /* 增加輸入框高度，確保使用者文字與系統提示不重疊 */
+    div[data-testid="stTextInput"] input {
+        height: 55px !important;
+        padding-top: 10px !important;
+        padding-bottom: 20px !important;
     }
-    /* 確保側邊欄頂部有適當空間，防止選單被裁切 */
-    [data-testid="stSidebar"] {
-        padding-top: 1rem;
+    /* 側邊欄頂部預留空間，防止第一個選項被裁切 */
+    [data-testid="stSidebarNav"] {
+        padding-top: 2rem;
     }
-    /* 調整分頁標籤字體 */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 系統靜態資料
+# 3. 系統資料：完整模型清單與連結
 PROVIDER_INFO = {
     "Google Gemini": "https://aistudio.google.com/app/apikey",
-    "OpenRouter": "https://openrouter.ai/models",
     "OpenAI": "https://platform.openai.com/docs/models",
     "Anthropic Claude": "https://docs.anthropic.com/en/docs/about-claude/models",
     "xAI Grok": "https://console.x.ai/",
-    "DeepSeek": "https://api-docs.deepseek.com/zh-cn/information/model_list"
+    "DeepSeek": "https://api-docs.deepseek.com/zh-cn/information/model_list",
+    "NVIDIA": "https://build.nvidia.com/explore/discover",
+    "OpenRouter": "https://openrouter.ai/models"
 }
 
 MODEL_DATA = {
-    "Google Gemini": ["自定義輸入", "gemini-3.1-flash-lite", "gemini-2.5-pro", "gemini-1.5-flash"],
-    "OpenRouter": ["自定義輸入", "google/gemini-2.5-flash:free", "meta-llama/llama-3.1-8b-instruct:free"],
-    "OpenAI": ["自定義輸入", "gpt-5.2", "gpt-4o", "o3-deep-research"],
-    "Anthropic Claude": ["自定義輸入", "claude-3-5-sonnet-latest", "claude-4-preview"],
-    "xAI Grok": ["自定義輸入", "grok-4.1", "grok-3"],
-    "DeepSeek": ["自定義輸入", "deepseek-v4", "deepseek-r1"]
+    "Google Gemini": [
+        "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
+        "Gemini 2.5 Flash", "Gemini 2.5 Pro", "Gemini 2.5 Flash-Lite", "Gemini Embedding 2"
+    ],
+    "OpenAI": [
+        "自定義輸入", "GPT-5.2", "GPT-5 mini", "GPT-5 nano", "GPT-5.2 pro", "GPT-5", 
+        "GPT-4.1", "gpt-oss-120b", "gpt-oss-20b", "o3-deep-research", "o4-mini-deep-research"
+    ],
+    "Anthropic Claude": [
+        "自定義輸入", "Claude Opus 4.7", "Claude Opus 4.6", "Claude Sonnet 4.6", "Claude Haiku 4.5"
+    ],
+    "xAI Grok": [
+        "自定義輸入", "grok-4.1", "grok-4.1-mini", "grok-3", "grok-3-mini"
+    ],
+    "DeepSeek": [
+        "自定義輸入", "DeepSeek-V4", "DeepSeek-V4 Flash", "DeepSeek-V4 Pro", "DeepSeek-V3.1", 
+        "DeepSeek R1", "DeepSeek Math-7B"
+    ],
+    "NVIDIA": [
+        "自定義輸入", "Nemotron RAG"
+    ],
+    "OpenRouter": [
+        "自定義輸入", 
+        "google/gemini-2.5-flash:free", 
+        "google/gemini-3-flash:free", 
+        "meta-llama/llama-3.1-8b-instruct:free", 
+        "mistralai/pixtral-12b:free",
+        "openai/gpt-4o-mini:free"
+    ]
 }
 
 # 4. 側邊欄配置
@@ -50,10 +75,11 @@ with st.sidebar:
     # 服務商選擇
     provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()), key="p_select")
     
+    # 統一金鑰記憶
     if "key_store" not in st.session_state:
         st.session_state["key_store"] = {}
-    
     current_key_name = f"{provider}_key"
+    
     user_key = st.text_input(
         "輸入 API 金鑰：", 
         value=st.session_state["key_store"].get(current_key_name, st.secrets.get(current_key_name, "")), 
@@ -64,11 +90,11 @@ with st.sidebar:
 
     st.write("---")
 
+    # 模型選擇
     temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"m_select_{provider}")
     
     if temp_model == "自定義輸入":
-        final_model = st.text_input("輸入精確模型 ID：", key=f"custom_id_{provider}")
-        st.caption("貼上模型 ID 後，請按下 Enter 鍵以套用。")
+        final_model = st.text_input("輸入精確模型 ID：", key=f"c_id_{provider}")
         st.caption(f"請參閱 [官方模型清單]({PROVIDER_INFO[provider]})")
     else:
         final_model = temp_model
@@ -83,28 +109,29 @@ if st.button("執行優化"):
     api_key = st.session_state["key_store"].get(current_key_name)
     
     if not api_key:
-        st.error(f"錯誤：未偵測到金鑰。")
+        st.error("錯誤：未偵測到金鑰。")
     elif not final_model:
-        st.warning("請先選取或手動輸入模型 ID。")
+        st.warning("請先輸入模型 ID。")
     elif not raw_prompt:
-        st.warning("請輸入指令內容。")
+        st.warning("請輸入內容。")
     else:
         system_instruction = (
-            "你是一位具備高度語意洞察力的專家。你的任務是將使用者的原始需求重構為專業指令。 "
-            "1. 語意校準：若發現術語錯誤（如：up down），請自動更正為專業術語（如：Top-Down）。 "
-            "2. 專家分配：根據需求自動分配專業角色，嚴禁在輸出中提及自己是優化器或工程師。 "
-            "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何前言或優化說明。 "
-            "輸出結構：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
-            "使用正體中文回答。"
+            "你是一位具備深度語意分析能力的專家。你的任務是優化使用者的原始指令。 "
+            "1. 語意診斷：若輸入中存在不明術語或拼寫錯誤（例如: up down），請自動校正為專業術語（例如: Top-Down）。 "
+            "2. 專家分配：根據需求自動分配解決問題的專業角色，嚴禁在輸出中提及自己是工程師。 "
+            "3. 純淨輸出：嚴禁前言與說明。輸出僅包含以下 Markdown 結構： "
+            "[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
+            "確保內容詳盡且具備實戰價值。使用正體中文。"
         )
         
-        with st.spinner("優化中..."):
+        with st.spinner("語意優化中..."):
             try:
+                # 服務商路由
                 if provider == "Google Gemini":
                     f_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel(f_model)
-                    response = model.generate_content(f"{system_instruction}\n\n需求：{raw_prompt}")
+                    response = model.generate_content(f"{system_instruction}\n\n需求內容：{raw_prompt}")
                     res = response.text
                 elif provider == "Anthropic Claude":
                     client = anthropic.Anthropic(api_key=api_key)
@@ -115,7 +142,8 @@ if st.button("執行優化"):
                     res = response.content[0].text
                 else:
                     base_urls = {
-                        "OpenAI": None, "xAI Grok": "https://api.x.ai/v1", "DeepSeek": "https://api.deepseek.com", "OpenRouter": "https://openrouter.ai/api/v1"
+                        "OpenAI": None, "xAI Grok": "https://api.x.ai/v1", "DeepSeek": "https://api.deepseek.com", 
+                        "NVIDIA": "https://integrate.api.nvidia.com/v1", "OpenRouter": "https://openrouter.ai/api/v1"
                     }
                     client = OpenAI(api_key=api_key, base_url=base_urls.get(provider))
                     response = client.chat.completions.create(
@@ -125,7 +153,7 @@ if st.button("執行優化"):
                     )
                     res = response.choices[0].message.content
 
-                # 6. 結果顯示
+                # 6. 結果輸出
                 st.write("---")
                 tab_code, tab_preview = st.tabs(["指令複製", "結果預覽"])
                 with tab_code:
