@@ -6,33 +6,26 @@ import anthropic
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 深度 UI 修復
+# 2. UI 空間佈局優化
 st.markdown("""
     <style>
-    /* 核心修復 1：解決第一個選項消失。確保側邊欄內容可以溢出顯示下拉選單，不被邊界裁切 */
-    [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
-        overflow: visible !important;
-    }
-    
-    /* 核心修復 2：解決文字重疊。精確校正輸入框高度與間距 (適中比例) */
     div[data-testid="stTextInput"] > div[data-baseweb="input"] {
-        min-height: 62px !important; 
-        display: flex !important;
-        align-items: flex-start !important;
-        padding-top: 8px !important;
+        min-height: 60px !important; 
+        padding-top: 5px !important;
     }
     
     div[data-testid="stTextInput"] input {
-        line-height: 1.2 !important;
-        margin-bottom: 18px !important; /* 確保使用者文字與底部提示小字之間有足夠物理空間，不重疊 */
+        margin-bottom: 15px !important; 
     }
 
-    /* 調整提示小字 (Press Enter to apply) 的位置 */
     div[data-testid="stInputInstructions"] {
         position: absolute !important;
-        bottom: 4px !important;
+        bottom: 2px !important;
         font-size: 10px !important;
-        color: #888 !important;
+    }
+
+    [data-testid="stSidebarContent"] {
+        padding-top: 2rem !important;
     }
 
     .stTabs [data-baseweb="tab-list"] button {
@@ -41,7 +34,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 完整模型資料庫
+# 3. 2026 完整模型清單資料庫
 MODEL_DATA = {
     "Google Gemini": [
         "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
@@ -65,49 +58,42 @@ MODEL_DATA = {
         "自定義輸入", "Nemotron RAG"
     ],
     "OpenRouter": [
-        "自定義輸入", 
-        "google/gemini-3-flash:free", 
-        "google/gemini-2.5-flash:free", 
-        "meta-llama/llama-3.1-8b-instruct:free", 
-        "mistralai/pixtral-12b:free", 
-        "openai/gpt-4o-mini:free"
+        "自定義輸入", "google/gemini-3-flash:free", "google/gemini-2.5-flash:free", 
+        "meta-llama/llama-3.1-8b-instruct:free", "mistralai/pixtral-12b:free", "openai/gpt-4o-mini:free"
     ]
 }
 
-PROVIDER_LINKS = {
-    "Google Gemini": "https://aistudio.google.com/app/apikey",
-    "OpenRouter": "https://openrouter.ai/models",
-    "OpenAI": "https://platform.openai.com/docs/models",
-    "Anthropic Claude": "https://docs.anthropic.com/en/docs/about-claude/models"
-}
-
-# 4. 側邊欄
+# 4. 側邊欄配置
 with st.sidebar:
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
     st.title("系統配置")
     
-    provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()), key="p_select_main")
+    provider = st.radio(
+        "選擇服務提供商：", 
+        list(MODEL_DATA.keys()), 
+        index=0, 
+        key="stable_provider_selector"
+    )
     
     if "key_store" not in st.session_state:
         st.session_state["key_store"] = {}
-    current_key_name = f"{provider}_key"
     
+    # 金鑰輸入
+    current_key_name = f"{provider}_key"
     user_key = st.text_input(
         "輸入 API 金鑰：", 
-        value=st.session_state["key_store"].get(current_key_name, st.secrets.get(current_key_name, "")), 
+        value=st.session_state["key_store"].get(current_key_name, ""), 
         type="password",
-        key=f"api_key_in_{provider}"
+        key="api_key_universal"
     )
     st.session_state["key_store"][current_key_name] = user_key
 
     st.write("---")
 
-    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"m_select_in_{provider}")
+    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"model_select_{provider}")
     
     if temp_model == "自定義輸入":
-        final_model = st.text_input("輸入精確模型 ID：", key=f"cid_in_{provider}")
+        final_model = st.text_input("輸入精確模型 ID：", key=f"custom_id_{provider}")
         st.caption("貼上 ID 後，請按下 Enter 鍵以套用。")
-        st.caption(f"請參閱 [官方模型清單]({PROVIDER_LINKS.get(provider, '#')})")
     else:
         final_model = temp_model
 
@@ -128,21 +114,21 @@ if st.button("執行優化"):
         st.warning("請輸入內容。")
     else:
         system_instruction = (
-            "你是一位專業的提示詞工程師。請優化使用者的原始需求。 "
-            "1. 語意診斷：若發現術語錯誤（如: up down），請根據上下文推論意圖並自動校正（如: Top-Down）。 "
-            "2. 專家分配：根據校正後的需求分配專業角色，嚴禁稱呼自己為優化器。 "
-            "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何前言說明。 "
+            "你是一位具備深度語意洞察力的專家。請優化使用者的原始需求。 "
+            "1. 語意診斷：若發現術語錯誤（如: up down），請自動更正為專業術語（如: Top-Down）。 "
+            "2. 專家分配：根據需求自動分配專業角色，嚴禁稱呼自己為優化器。 "
+            "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何說明。 "
             "結構：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
-            "使用正體中文。"
+            "使用正體中文回答。"
         )
         
-        with st.spinner("語意優化中..."):
+        with st.spinner("語意診斷中..."):
             try:
                 if provider == "Google Gemini":
                     f_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel(f_model)
-                    response = model.generate_content(f"{system_instruction}\n\n需求內容：{raw_prompt}")
+                    response = model.generate_content(f"{system_instruction}\n\n需求：{raw_prompt}")
                     res = response.text
                 elif provider == "Anthropic Claude":
                     client = anthropic.Anthropic(api_key=api_key)
@@ -167,7 +153,7 @@ if st.button("執行優化"):
                 st.write("---")
                 tab_code, tab_preview = st.tabs(["指令複製", "結果預覽"])
                 with tab_code:
-                    st.info("說明：請點擊右上角按鈕複製專業指令。")
+                    st.info("請點擊右上方按鈕複製專業指令。")
                     st.code(res, language="markdown")
                 with tab_preview:
                     st.markdown(res)
