@@ -25,7 +25,7 @@ if st.button("開始優化"):
         st.error("請提供 API Key！")
     else:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
         
         system_instruction = "你是一名 AI 提示詞優化專家，請將使用者的輸入轉化為 [角色]、[背景]、[指令]、[約束] 四個維度。"
         
