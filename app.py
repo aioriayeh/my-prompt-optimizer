@@ -6,50 +6,68 @@ import anthropic
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 介面淨化：使用更精確的 CSS，只隱藏文字，不影響點擊功能
+# 2. 介面淨化：CSS 隱藏提示文字並維持輸入框功能
 st.markdown("""
     <style>
-    /* 準確隱藏輸入框下方的提示文字 (Press Enter to apply) */
     div[data-testid="stInputInstructions"] {
         display: none !important;
     }
-    /* 調整分頁組件的字體與間距 */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 系統靜態資料
+# 3. 系統資料：廠商清單與 2026 最新模型列表
 PROVIDER_INFO = {
-    "Google Gemini (官方)": "https://aistudio.google.com/app/model",
-    "OpenRouter (聚合)": "https://openrouter.ai/models?order=per_request_usd_asc&types=free",
-    "OpenAI (官方)": "https://platform.openai.com/docs/models",
-    "Anthropic (官方)": "https://docs.anthropic.com/en/docs/about-claude/models",
-    "Groq (高流速)": "https://console.groq.com/docs/models",
-    "DeepSeek (官方)": "https://api-docs.deepseek.com/zh-cn/information/model_list"
+    "Google Gemini": "https://aistudio.google.com/app/model",
+    "OpenAI": "https://platform.openai.com/docs/models",
+    "Anthropic Claude": "https://docs.anthropic.com/en/docs/about-claude/models",
+    "xAI Grok": "https://console.x.ai/",
+    "DeepSeek": "https://api-docs.deepseek.com/zh-cn/information/model_list",
+    "NVIDIA": "https://build.nvidia.com/explore/discover",
+    "OpenRouter": "https://openrouter.ai/models"
 }
 
 MODEL_DATA = {
-    "Google Gemini (官方)": ["models/gemini-2.5-flash", "models/gemini-1.5-pro", "自定義輸入"],
-    "OpenRouter (聚合)": ["google/gemini-2.5-flash:free", "google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.1-8b-instruct:free", "自定義輸入"],
-    "OpenAI (官方)": ["gpt-4o", "gpt-4o-mini", "自定義輸入"],
-    "Anthropic (官方)": ["claude-3-5-sonnet-latest", "自定義輸入"],
-    "Groq (高流速)": ["llama-3.3-70b-versatile", "自定義輸入"],
-    "DeepSeek (官方)": ["deepseek-chat", "自定義輸入"]
+    "Google Gemini": [
+        "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
+        "Gemini 2.5 Flash", "Gemini 2.5 Pro", "Gemini 2.5 Flash-Lite", "Gemini Embedding 2"
+    ],
+    "OpenAI": [
+        "自定義輸入", "GPT-5.2", "GPT-5 mini", "GPT-5 nano", "GPT-5.2 pro", "GPT-5", 
+        "GPT-4.1", "gpt-oss-120b", "gpt-oss-20b", "o3-deep-research", "o4-mini-deep-research"
+    ],
+    "Anthropic Claude": [
+        "自定義輸入", "Claude Opus 4.7", "Claude Opus 4.6", "Claude Sonnet 4.6", "Claude Haiku 4.5"
+    ],
+    "xAI Grok": [
+        "自定義輸入", "grok-4.1", "grok-4.1-mini", "grok-3", "grok-3-mini"
+    ],
+    "DeepSeek": [
+        "自定義輸入", "DeepSeek-V4", "DeepSeek-V4 Flash", "DeepSeek-V4 Pro", "DeepSeek-V3.1", 
+        "DeepSeek R1", "DeepSeek Math-7B"
+    ],
+    "NVIDIA": [
+        "自定義輸入", "Nemotron RAG (嵌入與語言重排序)"
+    ],
+    "OpenRouter": [
+        "自定義輸入", "google/gemini-2.5-flash:free", "meta-llama/llama-3.1-8b-instruct:free"
+    ]
 }
 
-# 4. 側邊欄配置
+# 4. 側邊欄：系統配置
 with st.sidebar:
     st.title("系統配置")
     
+    # 選擇提供商
     provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()))
     
+    # 狀態管理
     if "key_store" not in st.session_state:
         st.session_state["key_store"] = {}
     current_key_name = f"{provider}_key"
     
-    # 這裡增加了一個 key 參數，確保 Streamlit 能正確追蹤輸入框狀態
     user_key = st.text_input(
         f"輸入 {provider} API 金鑰：", 
         value=st.session_state["key_store"].get(current_key_name, st.secrets.get(current_key_name, "")), 
@@ -63,7 +81,7 @@ with st.sidebar:
     temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider])
     
     if temp_model == "自定義輸入":
-        final_model = st.text_input("輸入精確模型 ID：", key="custom_model_id_field")
+        final_model = st.text_input("輸入精確模型 ID：", key=f"custom_{provider}_id")
         st.caption(f"請參閱 [官方模型清單]({PROVIDER_INFO[provider]})")
     else:
         final_model = temp_model
@@ -80,7 +98,7 @@ if st.button("執行優化"):
     if not api_key:
         st.error(f"錯誤：未偵測到 {provider} 的金鑰。")
     elif not final_model:
-        st.warning("請先選擇或手動輸入模型 ID。")
+        st.warning("請輸入模型 ID。")
     elif not raw_prompt:
         st.warning("請輸入指令內容。")
     else:
@@ -88,39 +106,49 @@ if st.button("執行優化"):
         
         with st.spinner("執行中..."):
             try:
-                if provider == "Google Gemini (官方)":
+                if provider == "Google Gemini":
+                    formatted_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel(final_model)
+                    model = genai.GenerativeModel(formatted_model)
                     response = model.generate_content(f"{system_instruction}\n\n輸入內容：{raw_prompt}")
                     res = response.text
 
-                elif provider == "OpenRouter (聚合)":
-                    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-                    response = client.chat.completions.create(
-                        model=final_model,
-                        messages=[{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_prompt}],
-                        extra_headers={"HTTP-Referer": "https://streamlit.io", "X-Title": "PromptOptimizer"}
-                    )
-                    res = response.choices[0].message.content
-
-                elif provider in ["OpenAI (官方)", "Groq (高流速)", "DeepSeek (官方)"]:
-                    urls = {"OpenAI (官方)": None, "Groq (高流速)": "https://api.groq.com/openai/v1", "DeepSeek (官方)": "https://api.deepseek.com"}
-                    client = OpenAI(api_key=api_key, base_url=urls.get(provider))
-                    response = client.chat.completions.create(
-                        model=final_model,
-                        messages=[{"role": "system", "content": system_instruction}, {"role": "user", "content": raw_prompt}]
-                    )
-                    res = response.choices[0].message.content
-
-                elif provider == "Anthropic (官方)":
+                elif provider == "Anthropic Claude":
                     client = anthropic.Anthropic(api_key=api_key)
                     response = client.messages.create(
-                        model=final_model, 
-                        max_tokens=2048, 
-                        system=system_instruction, 
+                        model=final_model, max_tokens=2048, system=system_instruction,
                         messages=[{"role": "user", "content": raw_prompt}]
                     )
                     res = response.content[0].text
+
+                else:
+                    base_urls = {
+                        "OpenAI": None,
+                        "xAI Grok": "https://api.x.ai/v1",
+                        "DeepSeek": "https://api.deepseek.com",
+                        "NVIDIA": "https://integrate.api.nvidia.com/v1",
+                        "OpenRouter": "https://openrouter.ai/api/v1"
+                    }
+                    
+                    client_args = {"api_key": api_key}
+                    if base_urls[provider]:
+                        client_args["base_url"] = base_urls[provider]
+                    
+                    client = OpenAI(**client_args)
+                    
+                    headers = {}
+                    if provider == "OpenRouter":
+                        headers = {"HTTP-Referer": "https://streamlit.io", "X-Title": "PromptOptimizer"}
+                    
+                    response = client.chat.completions.create(
+                        model=final_model,
+                        messages=[
+                            {"role": "system", "content": system_instruction},
+                            {"role": "user", "content": raw_prompt}
+                        ],
+                        extra_headers=headers if headers else None
+                    )
+                    res = response.choices[0].message.content
 
                 # 6. 結果輸出
                 st.write("---")
@@ -137,7 +165,6 @@ if st.button("執行優化"):
             except Exception as e:
                 error_detail = str(e)
                 st.error(f"連線失敗：{error_detail}")
-                
                 if "404" in error_detail or "not found" in error_detail.lower():
-                    st.warning("偵測到模型 ID 錯誤。")
+                    st.info("偵測到模型 ID 錯誤。請點擊左側連結查詢最新 ID 並使用自定義輸入。")
                     st.link_button(f"查詢 {provider} 模型清單", PROVIDER_INFO[provider])
