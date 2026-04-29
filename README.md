@@ -1,76 +1,54 @@
-# 🚀 萬能提示詞優化器 (Universal Prompt Optimizer)
+# AI 指令優化工具 (AI Prompt Optimizer)
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge.svg)](https://my-prompt-optimizer-ualuaimeahqqtvstsoirm2.streamlit.app/)
+本專案是一個基於 Streamlit 框架開發的多模型指令優化平台。旨在協助使用者將模糊、不完整的原始指令（Prompt），透過全球頂尖的語言模型（LLM）轉化為結構化、高精確度的專業指令，內容涵蓋角色任務、背景資訊、具體指令與約束條件四大維度。
 
-這是一個基於 **Streamlit** 與 **Google Gemini API** 開發的互動式 Web 應用程式。旨在幫助使用者將模糊、簡短的原始指令，自動轉化為結構化、精確且高品質的 AI 提示詞 (Prompt)。
+## 核心功能
 
-## ✨ 核心特色
+* 多服務商整合：支援 Google Gemini、OpenRouter、OpenAI、Anthropic、Groq 與 DeepSeek 等主流 API 介面。
+* 動態模型配置：提供預設熱門模型選單，並支援「自定義輸入」模型 ID 功能。當廠商更新模型名稱時，使用者可手動修正 ID，無需改動原始碼。
+* 雙重結果輸出：
+    * 指令複製 (Code)：提供純文字區塊，內建複製按鈕，確保擷取的指令不帶格式文字。
+    * 結果預覽 (Markdown)：視覺化呈現排版後的結果，方便確認結構與內容。
+* 智慧錯誤引導：當發生連線失敗或模型 ID 錯誤（404）時，系統將自動提供該服務商的官方模型清單連結。
+* 安全與隱私：所有 API 金鑰均儲存於當前會話（Session State），不記錄於後端伺服器，關閉網頁後自動清除。
 
-* **結構化優化邏輯**：自動將提示詞重構成「角色任務、背景資訊、具體指令、約束條件」四大維度，大幅提升 AI 輸出品質。
-* **多模型自由切換**：支援最新的 **Gemini 2.5 Flash**、**Gemini 1.5 Pro** 等多種模型，使用者可根據需求調整推論強度。
-* **靈活的 API 管理**：
-    * **隱形回退機制**：預設使用開發者配置的 API Key，確保新手能立即上手。
-    * **自訂金鑰輸入**：支援使用者輸入私有 API Key，並具備會話記憶功能，保護隱私且不佔用他人額度。
-* **響應式介面**：採用 Streamlit 框架，支援電腦與行動裝置流暢操作。
+## 使用指南
 
-## 🛠️ 技術棧 (Tech Stack)
+1. 配置服務商：在側邊欄選擇欲使用的 AI 服務提供商。
+2. 輸入金鑰：填入對應服務商的 API Key（系統亦支援讀取 Streamlit Secrets 設定）。
+3. 選取模型：從選單中挑選預設模型，或選擇「自定義輸入」並手動填入精確的模型 ID。
+4. 輸入指令：在主畫面的文字區域輸入欲優化的原始內容。
+5. 執行優化：點擊「執行優化」按鈕進行運算。
+6. 擷取結果：優化完成後，可於「指令複製」分頁點擊按鈕獲取指令。
 
-* **Language**: Python 3.14+
-* **Frontend**: Streamlit
-* **AI Engine**: Google Generative AI (Gemini API)
-* **Deployment**: Streamlit Cloud
-* **Version Control**: Git / GitHub
+## 本地端部署
 
-## 🚀 快速開始
+請確保您的電腦已安裝 Python 3.9 或以上版本。
 
-### 1. 獲取 Gemini API Key
-在使用本工具前，建議先前往 [Google AI Studio](https://aistudio.google.com/) 申請免費的 API Key。
+1. 複製儲存庫：
+   git clone https://github.com/您的帳號/專案名稱.git
 
-### 2. 在地端執行 (Local Execution)
-如果你想在自己的電腦上執行此專案：
+2. 安裝必要套件：
+   pip install streamlit google-generativeai openai anthropic
 
-```bash
-# 複製儲存庫
-git clone https://github.com/aioriayeh/my-prompt-optimizer.git
+3. 啟動應用程式：
+   streamlit run app.py
 
-# 進入資料夾
-cd my-prompt-optimizer
+## 技術架構與安全說明
 
-# 安裝必要套件
-pip install -r requirements.txt
+* 介面架構：採用 Streamlit 作為前端介面，並透過 CSS 淨化 UI 元素，確保極簡視覺體驗。
+* 資料隔離：不同使用者之間的會話完全隔離，金鑰與輸入內容互不干涉。
+* 異常處理：針對模型 API 的常見錯誤（如額度限制、路徑錯誤）設有攔截機制，提升系統魯棒性。
 
-# 啟動應用程式
-streamlit run app.py
-```
+## 資源清單
 
-### 3. 配置秘密參數 (Secrets)
-若要像雲端版本一樣自動讀取金鑰，請在專案根目錄建立 `.streamlit/secrets.toml` 檔案：
-```toml
-GEMINI_API_KEY = "你的_API_KEY"
-```
+若需查詢最新模型 ID，請參閱以下連結：
 
-## 📝 使用範例
-
-**原始輸入：**
-> 幫我寫個簡單的行銷計畫
-
-**優化後指令：**
-1.  **[角色任務]**：你是一位資深的行銷策略顧問...
-2.  **[背景資訊]**：使用者需要針對特定產品制定初步行動方案...
-3.  **[具體指令]**：請分析目標客群、選擇傳播渠道並制定三步驟執行計畫...
-4.  **[約束條件]**：字數限制在 500 字內，語氣專業且具備說服力...
-
-## 🔒 隱私與安全說明
-
-* **金鑰安全**：本程式不設有任何後端資料庫。使用者在網頁介面輸入的 API Key 僅儲存在當前瀏覽器的會話 (Session State) 中，重新整理或關閉分頁後即失效，開發者無法獲取您的私密資訊。
-* **開源透明**：所有代碼均公開透明，無任何惡意腳本。
-
-## 🤝 貢獻與反饋
-
-如果你有任何建議或發現 Bug，歡迎透過 GitHub Issues 提交回饋。
+* Google AI Studio: https://aistudio.google.com/
+* OpenRouter Models: https://openrouter.ai/models
+* OpenAI Models: https://platform.openai.com/docs/models
+* Anthropic Models: https://docs.anthropic.com/en/docs/about-claude/models
 
 ---
-**開發者**：aioriayeh
-**專案連結**：[aioriayeh/my-prompt-optimizer](https://github.com/aioriayeh/my-prompt-optimizer)
-
----
+開發者：aioriayeh
+專案版本：2026 穩定版
