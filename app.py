@@ -3,18 +3,13 @@ import google.generativeai as genai
 from openai import OpenAI
 import anthropic
 
-# 1. 頁面基礎配置
+# 1. 頁面配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 深度 UI 修復邏輯
+# 2. UI 空間佈局：物理性加大輸入框，解決重疊問題
 st.markdown("""
     <style>
-    /* 解決選單消失：確保側邊欄容器允許溢出內容顯示 */
-    [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
-        overflow: visible !important;
-    }
-    
-    /* 解決文字重疊：物理加大輸入框高度，確保使用者文字與提示小字互不干擾 */
+    /* 增加輸入框高度，確保使用者文字與提示小字互不重疊 */
     div[data-testid="stTextInput"] > div[data-baseweb="input"] {
         min-height: 65px !important; 
         display: flex !important;
@@ -27,7 +22,7 @@ st.markdown("""
         margin-bottom: 20px !important; /* 強制推開底部小字 */
     }
 
-    /* 規範提示小字位置 */
+    /* 調整提示小字位置 */
     div[data-testid="stInputInstructions"] {
         position: absolute !important;
         bottom: 5px !important;
@@ -40,7 +35,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 2026 完整模型資料庫
+# 3. 2026 完整模型資料庫 (完全保留您提供的清單)
 MODEL_DATA = {
     "Google Gemini": [
         "自定義輸入", "Gemini 3.1 Pro", "Gemini 3 Flash", "Gemini 3.1 Flash-Lite", 
@@ -69,24 +64,28 @@ MODEL_DATA = {
     ]
 }
 
-# 4. 初始化 Session State 保險箱
+# 4. 初始化金鑰保險箱
 if "api_keys" not in st.session_state:
     st.session_state["api_keys"] = {p: "" for p in MODEL_DATA.keys()}
 
 # 5. 側邊欄配置
 with st.sidebar:
-    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True) # 緩衝頂部空間
     st.title("系統配置")
     
-    # 服務商選擇
-    provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()), key="provider_selector")
+    # 策略修正：使用靜態 Radio 代替動態 Selectbox，徹底根除選項消失問題
+    provider = st.radio(
+        "選擇服務提供商：", 
+        list(MODEL_DATA.keys()), 
+        index=0, 
+        key="fixed_provider_selector"
+    )
     
-    # API 金鑰同步輸入 (每個服務商擁有獨立元件 Key 以確保刷新)
+    # 金鑰自動記憶與刷新
     api_key = st.text_input(
         "輸入 API 金鑰：", 
         value=st.session_state["api_keys"].get(provider, ""), 
         type="password",
-        key=f"api_input_{provider}"
+        key=f"api_key_field_{provider}"
     )
     st.session_state["api_keys"][provider] = api_key
 
@@ -117,17 +116,17 @@ if st.button("執行優化"):
     elif not raw_prompt:
         st.warning("請輸入內容。")
     else:
-        # 指令優化核心 (內建術語校準邏輯)
+        # 指令優化核心 (含語意校準邏輯)
         system_instruction = (
-            "你是一位專業的提示詞工程師。請優化使用者的原始需求。 "
-            "1. 語意診斷：若發現術語錯誤（如: up down），請根據上下文推論意圖並自動校正（如: Top-Down）。 "
-            "2. 專家分配：根據校正後的需求分配專業角色。 "
+            "你是一位具備深度語意分析能力的專家。你的任務是優化使用者的原始指令。 "
+            "1. 語意診斷：若發現術語錯誤（如: up down），請自動校正為專業術語（如: Top-Down）。 "
+            "2. 專家分配：根據需求自動分配解決問題的專業角色。 "
             "3. 純淨輸出：僅輸出 Markdown 結構，嚴禁任何前言說明。 "
-            "結構：[角色任務]、[背景資訊]、[具體指令]、[約束條件]、[思維鏈引導 (CoT)]。 "
-            "使用正體中文。"
+            "結構：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
+            "使用正體中文回答。"
         )
         
-        with st.spinner("語意優化中..."):
+        with st.spinner("執行優化中..."):
             try:
                 if provider == "Google Gemini":
                     f_model = final_model if final_model.startswith("models/") else f"models/{final_model}"
