@@ -1,6 +1,2 @@
 streamlit
-<<<<<<< HEAD
 google-generativeai
-=======
-google-generativeai
->>>>>>> 05db3ca74a41943b986aef3e96dc7fbebe7d8511
