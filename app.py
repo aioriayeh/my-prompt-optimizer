@@ -6,23 +6,29 @@ import anthropic
 # 1. 頁面基礎配置
 st.set_page_config(page_title="AI 指令優化工具", layout="wide")
 
-# 2. 介面淨化：CSS 隱藏內建提示，確保不重疊
+# 2. 介面強化淨化：強制隱藏所有內建提示，並解決選單裁剪問題
 st.markdown("""
     <style>
-    /* 隱藏所有輸入框內建的指令文字 */
-    div[data-testid="stInputInstructions"] {
+    /* 1. 徹底隱藏輸入框內的所有指令小字 (Press Enter to apply) */
+    div[data-testid="stInputInstructions"], .st-ae, .st-af {
         display: none !important;
+        visibility: hidden !important;
+        height: 0px !important;
     }
-    /* 調整分頁標籤樣式 */
+    /* 2. 確保側邊欄內容不會被頂部裁剪 */
+    [data-testid="stSidebarNav"] {
+        padding-top: 20px;
+    }
+    /* 3. 調整分頁樣式 */
     .stTabs [data-baseweb="tab-list"] button {
         font-size: 16px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 系統資料：更新 2026 最新官方連結與模型清單
+# 3. 系統資料：2026 穩定連結與模型列表
 PROVIDER_INFO = {
-    "Google Gemini": "https://aistudio.google.com/app/prompts/new",
+    "Google Gemini": "https://aistudio.google.com/app/apikey",
     "OpenAI": "https://platform.openai.com/docs/models",
     "Anthropic Claude": "https://docs.anthropic.com/en/docs/about-claude/models",
     "xAI Grok": "https://console.x.ai/",
@@ -33,12 +39,7 @@ PROVIDER_INFO = {
 
 MODEL_DATA = {
     "Google Gemini": [
-        "自定義輸入", 
-        "gemini-3.1-flash-lite (免費)", 
-        "gemini-3-flash (免費)", 
-        "gemini-3.1-pro", 
-        "gemini-2.5-flash", 
-        "gemini-2.5-pro"
+        "自定義輸入", "gemini-3.1-flash-lite", "gemini-3-flash", "gemini-3.1-pro", "gemini-2.5-flash", "gemini-2.5-pro"
     ],
     "OpenAI": [
         "自定義輸入", "GPT-5.2", "GPT-5 mini", "GPT-5 nano", "GPT-5", "o3-deep-research"
@@ -53,7 +54,7 @@ MODEL_DATA = {
         "自定義輸入", "DeepSeek-V4", "DeepSeek-V4 Pro", "DeepSeek R1"
     ],
     "NVIDIA": [
-        "自定義輸入", "Nemotron RAG (嵌入與語言重排序)"
+        "自定義輸入", "Nemotron RAG"
     ],
     "OpenRouter": [
         "自定義輸入", "google/gemini-2.5-flash:free", "meta-llama/llama-3.1-8b-instruct:free"
@@ -62,9 +63,10 @@ MODEL_DATA = {
 
 # 4. 側邊欄配置
 with st.sidebar:
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     st.title("系統配置")
     
-    provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()))
+    provider = st.selectbox("選擇服務提供商：", list(MODEL_DATA.keys()), key="main_provider_select")
     
     if "key_store" not in st.session_state:
         st.session_state["key_store"] = {}
@@ -80,14 +82,14 @@ with st.sidebar:
 
     st.write("---")
 
-    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider])
+    temp_model = st.selectbox("選擇預設模型：", MODEL_DATA[provider], key=f"model_select_{provider}")
     
     if temp_model == "自定義輸入":
         final_model = st.text_input("輸入精確模型 ID：", key=f"custom_{provider}_id")
-        st.caption("輸入或貼上後請按下 Enter 鍵以套用內容。")
+        st.caption("輸入後請按 Enter 鍵確認。")
         st.caption(f"請參閱 [官方模型清單]({PROVIDER_INFO[provider]})")
     else:
-        final_model = temp_model.split(" (")[0]
+        final_model = temp_model
 
 # 5. 主介面
 st.title("AI 指令優化工具")
@@ -105,7 +107,7 @@ if st.button("執行優化"):
     elif not raw_prompt:
         st.warning("請輸入指令內容。")
     else:
-        # 純淨指令結構設定
+        # 指令優化核心
         system_instruction = (
             "你是一位專業的提示詞工程師。請將輸入內容重構為高品質的 Markdown 提示詞結構。 "
             "輸出結果必須僅包含以下標題及其詳盡內容：[角色定義 (Role)]、[任務說明 (Task)]、[背景與上下文 (Context)]、[輸出格式 (Format)]、[思維鏈引導 (CoT)]。 "
@@ -131,11 +133,8 @@ if st.button("執行優化"):
 
                 else:
                     base_urls = {
-                        "OpenAI": None,
-                        "xAI Grok": "https://api.x.ai/v1",
-                        "DeepSeek": "https://api.deepseek.com",
-                        "NVIDIA": "https://integrate.api.nvidia.com/v1",
-                        "OpenRouter": "https://openrouter.ai/api/v1"
+                        "OpenAI": None, "xAI Grok": "https://api.x.ai/v1", "DeepSeek": "https://api.deepseek.com",
+                        "NVIDIA": "https://integrate.api.nvidia.com/v1", "OpenRouter": "https://openrouter.ai/api/v1"
                     }
                     client_args = {"api_key": api_key}
                     if base_urls[provider]: client_args["base_url"] = base_urls[provider]
@@ -157,12 +156,12 @@ if st.button("執行優化"):
                     st.code(res, language="markdown")
                 
                 with tab_preview:
-                    st.info("說明：此處顯示排版後的視覺效果。")
+                    st.info("說明：此處顯示視覺化排版效果。")
                     st.markdown(res)
 
             except Exception as e:
                 error_detail = str(e)
                 st.error(f"連線失敗：{error_detail}")
                 if "404" in error_detail or "not found" in error_detail.lower():
-                    st.info(f"偵測到模型 ID 錯誤。請點擊左側連結查詢最新 ID 並使用自定義輸入。")
+                    st.info(f"偵測到模型 ID 錯誤。請點擊左側連結查詢最新 ID。")
                     st.link_button(f"查詢 {provider} 模型清單", PROVIDER_INFO[provider])
